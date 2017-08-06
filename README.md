@@ -1,8 +1,8 @@
 uViewer
 ====
 
-<br/>A simple viewer for VB6 to show PDF/WPS/EPUB documents.
-<br/>Written in ANSI-C, this library is also platform-independent, therefore, it's suitable for any case that we're able to call the C functions, for example, Java native interface.
+<br/>&emsp;&emsp;A simple viewer for VB6 to show PDF/WPS/EPUB documents.
+<br/>&emsp;&emsp;Written in ANSI-C, this library is also platform-independent, therefore, it's suitable for any case that we're able to call the C functions, for example, Java native interface.
 
 <br/>For a demo project for `Visual Basic 6`, please check 'platform/vb6/demo'.
 
