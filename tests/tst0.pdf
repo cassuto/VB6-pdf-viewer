@@ -1,0 +1,171 @@
+%PDF-1.4
+
+1 0 obj
+
+<<
+
+/Type /Pages
+
+/Kids [2 0 R]
+
+/Count 1
+
+>>
+
+endobj
+
+2 0 obj
+
+<<
+
+/Type /Page
+
+/Parent 1 0 R
+
+/MediaBox [0 0 612 792]
+
+/Contents 4 0 R
+
+/Resources
+
+<<
+
+/Font
+
+<<
+
+/Font1 5 0 R
+
+>>
+
+/XObject <<
+
+/Image1 6 0 R
+
+>>
+
+>>
+
+>>
+
+endobj
+
+3 0 obj
+
+<<
+
+/Type /Catalog
+
+/Pages 1 0 R
+
+>>
+
+endobj
+
+4 0 obj
+
+<<
+
+/Length 0
+
+>> stream
+
+1 0 0 RG
+
+0 792 m
+
+612 0 l
+
+s
+
+BT
+
+/Font1 10 Tf
+
+100 700 TD
+
+(Hello World!) Tj
+
+ET
+
+q
+
+100 0 0 100 300 600 cm
+
+/Image1 Do
+
+Q
+
+endstream
+
+endobj
+
+5 0 obj
+
+<<
+
+/Type /Font
+
+/Subtype /Type1
+
+/BaseFont /Helvetica
+
+>>
+
+endobj
+
+6 0 obj<<
+
+/Type /XObject
+
+/Subtype /Image
+
+/Width 8
+
+/Height 8
+
+/ColorSpace /DeviceRGB
+
+/BitsPerComponent 8
+
+/Length 0
+
+/Filter /ASCIIHexDecode
+
+>> stream
+
+FF0000 C00000 A00000 800000 600000 400000 200000 0000FF
+
+FF2000 C00000 A00000 800000 600000 400000 200000 0000C0
+
+FF4000 C00000 A00000 800000 600000 400000 200000 0000A0
+
+FF6000 C00000 A00000 800000 600000 400000 200000 000080
+
+FF8000 C00000 A00000 800000 600000 400000 200000 000060
+
+FFA000 C00000 A00000 800000 600000 400000 200000 000040
+
+FFC000 C00000 A00000 800000 600000 400000 200000 000020
+
+FFFF00 C0C000 A0A000 808000 606000 404000 202000 000000>
+
+endstream
+
+endobj
+
+xref
+
+trailer
+
+<<
+
+/Size 0
+
+/Root 3 0 R
+
+>>
+
+startxref
+
+%%EOF
