@@ -1,0 +1,238 @@
+# Configuration for the Makefile
+
+OS ?= $(shell uname)
+OS := $(OS:MINGW%=MINGW)
+OS := $(OS:Windows_NT=MINGW)
+OS := $(OS:Darwin=MACOS)
+
+HAVE_LIBDL ?= yes
+
+CFLAGS += -Wall -Wunused-function
+#-Wstrict-overflow
+
+ifeq "$(build)" "debug"
+ CFLAGS += -pipe -g -DDEBUG
+ LDFLAGS += -g
+else ifeq "$(build)" "release"
+ CFLAGS += -pipe -O2 -DNDEBUG -fomit-frame-pointer
+else ifeq "$(build)" "sanitize"
+ CFLAGS += -pipe -g -DDEBUG -fsanitize=address -fno-omit-frame-pointer
+ LDFLAGS += -fsanitize=address
+else ifeq "$(build)" "profile"
+ CFLAGS += -pipe -O2 -DNDEBUG -pg
+ LDFLAGS += -pg
+else ifeq "$(build)" "coverage"
+ CFLAGS += -pipe -g -DDEBUG -pg -fprofile-arcs -ftest-coverage
+ LIBS += -lgcov
+else ifeq "$(build)" "native"
+ CFLAGS += -pipe -O2 -DNDEBUG -fomit-frame-pointer -march=native -mfpmath=sse
+else ifeq "$(build)" "memento"
+ CFLAGS += -pipe -g -DMEMENTO -DDEBUG
+ LDFLAGS += -g -d -rdynamic
+ifeq "$(HAVE_LIBDL)" "yes"
+ CFLAGS += -DHAVE_LIBDL
+ LIBS += -ldl
+endif
+else ifeq "$(build)" "gperf"
+ CFLAGS += -pipe -O2 -DNDEBUG -fomit-frame-pointer -DGPERF
+ LIBS += -lprofiler
+else
+ $(error unknown build setting: '$(build)')
+endif
+
+ifeq "$(largefile)" "yes"
+ CFLAGS += -DFZ_LARGEFILE
+endif
+
+# Windows (MINGW) build doesn't use system libraries.
+ifeq "$(OS)" "MINGW"
+
+ HAVE_X11 ?= no
+
+# Mac OS X doesn't have pkg-config so we hard code paths.
+else ifeq "$(OS)" "MACOS"
+
+ HAVE_X11 ?= yes
+ HAVE_PTHREADS ?= yes
+
+ # Mac OS X deprecated openssl, so the default is to not include it.
+ HAVE_OPENSSL ?= no
+ SYS_OPENSSL_CFLAGS =
+ SYS_OPENSSL_LIBS =
+ ifeq "$(HAVE_OPENSSL)" "yes"
+  SYS_OPENSSL_CFLAGS = -DHAVE_OPENSSL
+  SYS_OPENSSL_LIBS = -lcrypto
+ endif
+
+ SYS_CURL_DEPS = -lpthread
+
+ SYS_X11_CFLAGS = -I/usr/X11R6/include
+ SYS_X11_LIBS = -L/usr/X11R6/lib -lX11 -lXext
+
+ SYS_FREETYPE_CFLAGS = $(shell freetype-config --cflags)
+ SYS_FREETYPE_LIBS = $(shell freetype-config --libs)
+ SYS_OPENJPEG_LIBS = -lopenjpeg
+ SYS_JBIG2DEC_LIBS = -ljbig2dec
+ SYS_JPEG_LIBS = -ljpeg
+ SYS_ZLIB_LIBS = -lz
+
+ CC = xcrun cc
+ AR = xcrun ar
+ LD = xcrun ld
+ RANLIB_CMD = xcrun ranlib $@
+
+ # Linux uses pkg-config for system libraries.
+ else ifeq "$(OS)" "Linux"
+
+ HAVE_X11 ?= yes
+ HAVE_PTHREADS ?= yes
+
+ ifeq "$(shell pkg-config --exists libcrypto && echo yes)" "yes"
+  SYS_OPENSSL_CFLAGS = -DHAVE_OPENSSL $(shell pkg-config --cflags libcrypto)
+  SYS_OPENSSL_LIBS = $(shell pkg-config --libs libcrypto)
+ endif
+
+ ifeq "$(shell pkg-config --exists libcurl && echo yes)" "yes"
+  HAVE_CURL = yes
+  SYS_CURL_CFLAGS = $(shell pkg-config --cflags libcurl)
+  SYS_CURL_LIBS = $(shell pkg-config --libs libcurl)
+ endif
+ SYS_CURL_DEPS = -lpthread -lrt
+
+ SYS_X11_CFLAGS = $(shell pkg-config --cflags x11 xext)
+ SYS_X11_LIBS = $(shell pkg-config --libs x11 xext)
+
+endif
+
+ SYS_HARFBUZZ_CFLAGS = $(shell pkg-config --cflags harfbuzz)
+ SYS_HARFBUZZ_LIBS = $(shell pkg-config --libs harfbuzz)
+ SYS_FREETYPE_CFLAGS = $(shell pkg-config --cflags freetype2)
+ SYS_FREETYPE_LIBS = $(shell pkg-config --libs freetype2)
+ SYS_OPENJPEG_CFLAGS = $(shell pkg-config --cflags libopenjp2)
+ SYS_OPENJPEG_LIBS = $(shell pkg-config --libs libopenjp2)
+ SYS_JBIG2DEC_LIBS = -ljbig2dec
+ SYS_JPEG_LIBS = -ljpeg
+ SYS_ZLIB_LIBS = -lz
+
+# The following section is an example of how to simply do cross-compilation
+# using these Makefiles. It builds for a beagleboard running ARM linux,
+# compiling on windows with the CodeSourcery G++ compilers.
+# Invoke this as:
+#      make OS=beagle-cross build=release
+# This does rely on the generated directory being populated with the cmap
+# files etc first. Either:
+#   1) do 'make generate' first (this relies on you having an appropriate host
+#   base C compiler set up - such as you would have on unix or in windows
+#   cygwin)
+#   2) do a non cross compile build (e.g. windows in MSVC) first.
+#   3) download the generated files from uview.com.
+
+ifeq "$(OS)" "beagle-cross"
+ CC = arm-none-linux-gnueabi-gcc
+ LD = arm-none-linux-gnueabi-gcc
+ AR = arm-none-linux-gnueabi-ar
+ CFLAGS += -O3 -mfpu=neon -mcpu=cortex-a8 -mfloat-abi=softfp -ftree-vectorize -ffast-math -fsingle-precision-constant
+ CROSSCOMPILE=yes
+ HAVE_PTHREADS ?= yes
+endif
+
+ifeq "$(OS)" "webos-pre-cross"
+ CC = arm-none-linux-gnueabi-gcc
+ LD = arm-none-linux-gnueabi-gcc
+ AR = arm-none-linux-gnueabi-ar
+ CFLAGS += -O3 -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp -ftree-vectorize -ffast-math -fsingle-precision-constant
+ CROSSCOMPILE=yes
+endif
+
+ifeq "$(OS)" "webos-pixi-cross"
+ CC = arm-none-linux-gnueabi-gcc
+ LD = arm-none-linux-gnueabi-gcc
+ AR = arm-none-linux-gnueabi-ar
+ CFLAGS += -O3 -mcpu=arm1136jf-s -mfpu=vfp -mfloat-abi=softfp -ffast-math -fsingle-precision-constant
+ CROSSCOMPILE=yes
+endif
+
+ifeq "$(OS)" "w64_x86-cross-mingw32"
+ CC = i686-w64-mingw32-gcc
+ LD = i686-w64-mingw32-gcc
+ AR = i686-w64-mingw32-ar
+ CROSSCOMPILE=yes
+endif
+
+ifeq "$(OS)" "w64_amd64-cross-mingw32"
+ CC = x86_64-w64-mingw32-gcc
+ LD = x86_64-w64-mingw32-gcc
+ AR = x86_64-w64-mingw32-ar
+ CROSSCOMPILE=yes
+endif
+
+ifeq "$(OS)" "pnacl-cross"
+ VALID_TOOLCHAINS := pnacl
+ TARGET = uview
+include $(NACL_SDK_ROOT)/tools/common.mk
+ CC = $(PNACL_CC)
+ CXX = $(PNACL_CXX)
+ LD = $(PNACL_LD)
+ AR = $(PNACL_LIB)
+ CFLAGS += -D__NACL__
+ CROSSCOMPILE=yes
+
+# Don't install libjpeg, libz, or libfreetype, since these are already
+# provided by naclports and the versions compiled here cause problems
+# with nacl.
+install-nacl-libs: $(OUT)/libuview.a $(OUT)/libmujs.a $(OUT)/libjbig2dec.a $(OUT)/libopenjpeg.a
+	install -d $(LIBDIR)/$(TOOLCHAIN)/$(CONFIG)/
+	install $(OUT)/libuview.a $(OUT)/libmujs.a $(OUT)/libjbig2dec.a $(OUT)/libopenjpeg.a $(LIBDIR)/$(TOOLCHAIN)/$(CONFIG)/
+endif
+
+
+# Most variables when building for iOS are set up in ios/build_libs.sh,
+# which is called from the Xcode project as a "Run Script" build step.
+# The following section works for both device and simulator builds.
+
+ifeq "$(OS)" "ios"
+ CC = xcrun cc
+ AR = xcrun ar
+ LD = xcrun ld
+ RANLIB_CMD = xcrun ranlib $@
+ CROSSCOMPILE=yes
+endif
+
+ifeq "$(OS)" "tizen-arm"
+ TIZEN_TOOLS=$(TIZEN_SDK)/tools/arm-linux-gnueabi-gcc-4.6/bin/arm-linux-gnueabi-
+ TIZEN_FLAGS=--sysroot=$(TIZEN_SDK)/platforms/mobile-2.3/rootstraps/mobile-2.3-device.core
+ CC = $(TIZEN_TOOLS)gcc $(TIZEN_FLAGS)
+ AR = $(TIZEN_TOOLS)ar
+ LD = $(TIZEN_TOOLS)ld $(TIZEN_FLAGS)
+ CROSSCOMPILE=yes
+endif
+
+ifeq "$(OS)" "tizen-x86"
+ TIZEN_TOOLS=$(TIZEN_SDK)/tools/i386-linux-gnueabi-gcc-4.6/bin/i386-linux-gnueabi-
+ TIZEN_FLAGS=--sysroot=$(TIZEN_SDK)/platforms/mobile-2.3/rootstraps/mobile-2.3-emulator.core
+ CC = $(TIZEN_TOOLS)gcc $(TIZEN_FLAGS)
+ AR = $(TIZEN_TOOLS)ar $(TIZEN_FLAGS)
+ LD = $(TIZEN_TOOLS)ld $(TIZEN_FLAGS)
+ CROSSCOMPILE=yes
+endif
+
+ifeq "$(OS)" "MINGW"
+ CC = gcc
+ WIN32_LIBS=-lcomdlg32 -lgdi32
+ HAVE_WIN32=yes
+ LDFLAGS += -Wl,-subsystem,windows
+endif
+
+# TODO: If crosscompiling, why not just call "make libs" instead of this exception?
+ifeq "$(CROSSCOMPILE)" "yes"
+ HAVE_X11 ?= no
+ HAVE_GLFW ?= no
+endif
+
+ifeq "$(HAVE_PTHREADS)" "yes"
+ CFLAGS += -DHAVE_PTHREADS
+ LIBS += -lpthread
+endif
+
+#HAVE_MUJS = yes
+#MUJS_LIBS = -lfreetype -lharfbuzz -lopenjp2 -ljbig2dec -ljpeg -lmujs -lz
