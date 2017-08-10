@@ -67,13 +67,13 @@ Public Sub ErrorMsg(msg As String, rc As Long)
 retry: '!todo: implement retry.
 
     Select Case MsgBox("error:" & msg & vbCrLf & _
-            "rc = " & errGetMsg(rc) & " (" & errGetMsg(rc, True) & ")", vbAbortRetryIgnore, App.Title)
-        Case vbIgnore
+            "rc = " & errGetMsg(rc) & " (" & errGetMsg(rc, True) & ")", vbRetryCancel + vbExclamation, App.Title)
+        Case vbCancel
             Exit Sub
         Case vbRetry
             GoTo retry
-        Case vbAbort
-            'g_exit = True
+        Case vbAbort ' unused
+            g_exit = True
     End Select
 End Sub
 

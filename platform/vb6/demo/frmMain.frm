@@ -1,21 +1,21 @@
 VERSION 5.00
 Begin VB.Form frmMain 
    Caption         =   "Form1"
-   ClientHeight    =   8175
+   ClientHeight    =   8085
    ClientLeft      =   60
    ClientTop       =   450
-   ClientWidth     =   10635
+   ClientWidth     =   10605
    LinkTopic       =   "Form1"
-   ScaleHeight     =   8175
-   ScaleWidth      =   10635
+   ScaleHeight     =   8085
+   ScaleWidth      =   10605
    StartUpPosition =   3  '´°¿ÚÈ±Ê¡
    Begin VB.CommandButton cmdZoom 
       Caption         =   "zoom"
       Height          =   255
-      Left            =   3360
+      Left            =   3240
       TabIndex        =   6
       Top             =   120
-      Width           =   1335
+      Width           =   735
    End
    Begin VB.HScrollBar hsView 
       Height          =   255
@@ -75,7 +75,8 @@ Option Explicit
 
 #Const FULL_FONTS = True
 
-Dim m_view As New clsViewer
+Dim WithEvents m_view As clsViewer
+Attribute m_view.VB_VarHelpID = -1
 
 Dim m_currentPage As Long
 Dim m_pageCount As Long
@@ -83,6 +84,7 @@ Dim m_boundX As Long
 Dim m_boundY As Long
 
 Dim rc As Long
+
 
 Private Sub cmdZoom_Click()
     Dim sx As Single, sy As Single
@@ -94,15 +96,18 @@ Private Sub cmdZoom_Click()
     If sy < 0 Then sy = 0
     
     Call m_view.zoom(sx, sy)
-    Call m_view.render(m_currentPage)
+    Call m_view.render(m_currentPage, True)
     picView.SetFocus
     picView.Refresh
 End Sub
 
 Private Sub Form_Load()
+    Dim rc As Long
     Dim fn As String
     
     Form_Resize
+    
+    Set m_view = New clsViewer ' create a viewer class
     
     '/////////////////////////////////////////////////////////////////////////////////////////
     
@@ -116,10 +121,14 @@ Private Sub Form_Load()
     '/////////////////////////////////////////////////////////////////////////////////////////
     
 #If FULL_FONTS Then
-    m_view.registerFont ("libuvfonts.dll")
+    rc = m_view.registerFont("libuvfonts.dll")
 #Else
-    m_view.registerFont ("libuvfonts-tiny.dll")
+    rc = m_view.registerFont("libuvfonts-tiny.dll")
 #End If
+
+    If FAILURE(rc) Then
+        Call ErrorMsg("registerFont()", IERR_LOAD_FONT)
+    End If
 
     '/////////////////////////////////////////////////////////////////////////////////////////
     
@@ -139,8 +148,8 @@ Private Sub Form_Resize()
     
     vsView.Left = picView.Width + 120
     hsView.Top = picView.Height + 480
-    picView.Width = Me.ScaleWidth - 240 - 255
-    picView.Height = Me.ScaleHeight - 600 - 255
+    picView.Width = Me.ScaleWidth - 240 - IIf(vsView.Visible, 255, 0)
+    picView.Height = Me.ScaleHeight - 600 - IIf(hsView.Visible, 255, 0)
     vsView.Height = picView.Height
     hsView.Width = picView.Width
 End Sub
@@ -148,19 +157,23 @@ End Sub
 Private Sub Form_Unload(Cancel As Integer)
     Call m_view.uninitViewer
     
+    Set m_view = Nothing ' terminate the viewer class
+    
     g_exit = True
 End Sub
 
+
+
 Private Sub picView_MouseDown(Button As Integer, Shift As Integer, x As Single, y As Single)
-    'm_view.onMouse X - m_boundX, Y - m_boundY, CLng(Button), 1
+    Call m_view.onMouse(x / Screen.TwipsPerPixelX - m_boundX, y / Screen.TwipsPerPixelY - m_boundY, CLng(Button), 1)
 End Sub
 
 Private Sub picView_MouseUp(Button As Integer, Shift As Integer, x As Single, y As Single)
-    'm_view.onMouse X - m_boundX, Y - m_boundY, CLng(Button), -1
+    Call m_view.onMouse(x / Screen.TwipsPerPixelX - m_boundX, y / Screen.TwipsPerPixelY - m_boundY, CLng(Button), -1)
 End Sub
 
 Private Sub picView_MouseMove(Button As Integer, Shift As Integer, x As Single, y As Single)
-    'm_view.onMouse(X - m_boundX, Y - m_boundY, CLng(Button), 0)
+    Call m_view.onMouse(x / Screen.TwipsPerPixelX - m_boundX, y / Screen.TwipsPerPixelY - m_boundY, CLng(Button), 0)
 End Sub
 
 
@@ -229,6 +242,32 @@ Private Sub updateSrcollbars()
 End Sub
 
 
+
+Private Sub m_view_onCursor(cursor As Long)
+    Screen.MouseIcon = LoadResPicture(100, vbResCursor)
+    Select Case cursor
+        Case NORMAL: Screen.MousePointer = vbDefault '!fixme: resizing cursor is gone when we drag the border of a Window
+        Case ARROW: Screen.MousePointer = vbArrow
+        Case HAND: Screen.MousePointer = vbCustom
+        Case WAIT: Screen.MousePointer = vbHourglass
+        Case CARET: Screen.MousePointer = vbArrowQuestion
+    End Select
+End Sub
+
+Private Sub m_view_onGotoPage(page As Long)
+    Call loadPage(page)
+End Sub
+
+Private Sub m_view_onGotoURL(url As String)
+    MsgBox "onGotoURL: " & url
+End Sub
+
+Private Sub m_view_onWarn(msg As String)
+    MsgBox "onWarn:" & vbCrLf & msg
+End Sub
+
+
+
 '***********************************************************************************
 'load a document file (within UI)
 '***********************************************************************************
@@ -254,14 +293,12 @@ End Sub
 
 Private Sub loadPage(n As Long)
     
-    rc = m_view.render(n)
+    rc = m_view.render(n, True)
     
     If (FAILURE(rc)) Then
         ErrorMsg "Render the document page.", rc
         GoTo error
     End If
-    
-    Call m_view.fillDocInfo
     
     picView.Refresh
     

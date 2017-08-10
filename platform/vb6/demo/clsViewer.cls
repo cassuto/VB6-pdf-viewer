@@ -21,6 +21,15 @@ Private m_width As Long
 Private m_n As Long
 Private m_samples As Long   ' Pointer to the pixels buffer
 Private m_pixmap As Long
+Private m_scale_x As Long, m_scale_y As Long
+
+'
+' Events
+'
+Public Event onCursor(cursor As Long)
+Public Event onGotoPage(page As Long)
+Public Event onGotoURL(url As String)
+Public Event onWarn(msg As String)
 
 
 Private Sub Class_Initialize()
@@ -30,6 +39,8 @@ Private Sub Class_Initialize()
     m_n = 0
     m_samples = 0
     m_pixmap = 0
+    m_scale_x = 100
+    m_scale_y = 100
     m_inited = False
 End Sub
 
@@ -66,6 +77,8 @@ Public Function initViewer() As Long
     
     Call registerEvents(m_ctx)
     
+    Call addViewClass(Me)
+    
     m_inited = True
     initViewer = IOK_SUCCEEDED
 End Function
@@ -85,6 +98,8 @@ Public Function uninitViewer()
         Call uv_drop_context(m_ctx)
         m_ctx = 0
     End If
+    
+    Call removeViewClass(Me)
     
     m_inited = False
 End Function
@@ -109,7 +124,7 @@ End Function
 'Render the doucment to a image buffer
 '***********************************************************************************
 
-Public Function render(page As Long) As Long
+Public Function render(page As Long, Optional fillInfo As Boolean = False) As Long
     Dim rc As Long
     
     ' release the previous page if needed
@@ -124,8 +139,15 @@ Public Function render(page As Long) As Long
         rc = uv_pixmap_getinfos(m_ctx, m_pixmap, m_width, m_height, m_n, m_samples)
         If (SUCCESS(rc)) Then
         
-            render = IOK_SUCCEEDED
-            Exit Function
+            If fillInfo Then
+                rc = uv_pixmap_fill_docinfo(m_ctx, m_pixmap)
+                If (SUCCESS(rc)) Then
+
+                    render = IOK_SUCCEEDED
+                    Exit Function
+                End If
+            End If
+            
         End If
         
     End If
@@ -151,7 +173,7 @@ End Function
 'Draw the image of page
 '***********************************************************************************
 
-Public Sub paint(hWnd As Long, X As Long, Y As Long)
+Public Sub paint(hWnd As Long, x As Long, y As Long)
     Dim rc As Long
     Dim hDC As Long
     Dim hBufferDC As Long
@@ -182,13 +204,13 @@ Public Sub paint(hWnd As Long, X As Long, Y As Long)
     '
     Select Case m_n
         Case 4: ' 4 BPP (Bytes Per Pixel)
-            rc = SetDIBitsToDevice(hDC, X, Y, m_width, m_height, 0, 0, 0, m_height, m_samples, bmInfo, 0)
+            rc = SetDIBitsToDevice(hDC, x, y, m_width, m_height, 0, 0, 0, m_height, m_samples, bmInfo, 0)
         Case 2: ' 2 BPP
             Dim color As Long
             rc = uv_convert_2_bpp(m_ctx, m_pixmap, color)
             
             If (SUCCESS(rc)) Then
-                rc = SetDIBitsToDevice(hDC, X, Y, m_width, m_height, 0, 0, 0, m_height, color, bmInfo, 0)
+                rc = SetDIBitsToDevice(hDC, x, y, m_width, m_height, 0, 0, 0, m_height, color, bmInfo, 0)
                 
                 Call uv_drop_mem(m_ctx, color)
             End If
@@ -206,6 +228,14 @@ End Sub
 
 
 '***********************************************************************************
+'Get the pointer of context
+'***********************************************************************************
+
+Public Function getContext() As Long
+    getContext = m_ctx
+End Function
+
+'***********************************************************************************
 'Get the number of pages
 '***********************************************************************************
 
@@ -219,6 +249,8 @@ End Function
 
 Public Function zoom(sx As Single, sy As Single) As Long
     zoom = uv_scale(m_ctx, sx, sy)
+    m_scale_x = sx
+    m_scale_y = sy
 End Function
 
 '***********************************************************************************
@@ -249,10 +281,28 @@ End Function
 'Handle the mouse event
 '***********************************************************************************
 
-Public Function onMouse(X As Long, Y As Long, btn As Long, state As Long) As Long
+Public Function onMouse(x As Long, y As Long, btn As Long, state As Long) As Long
     If m_pixmap <> 0 Then
-        onMouse = uv_mouse_event(m_ctx, m_pixmap, X, Y, btn, 0, state)
+        onMouse = uv_mouse_event(m_ctx, m_pixmap, x, y, btn, 0, state)
     Else
         onMouse = IERR_FAILED
     End If
 End Function
+
+
+'***********************************************************************************
+'Handle the callback
+'***********************************************************************************
+
+Public Sub invokeCursor(ByVal cursor As Long)
+    RaiseEvent onCursor(cursor)
+End Sub
+Public Sub invokeGotoPage(ByVal page As Long)
+    RaiseEvent onGotoPage(page)
+End Sub
+Public Sub invokeGotoURL(ByVal url As String)
+    RaiseEvent onGotoURL(url)
+End Sub
+Public Sub invokeWarn(ByVal msg As String)
+    RaiseEvent onWarn(msg)
+End Sub

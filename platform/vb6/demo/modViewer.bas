@@ -34,8 +34,12 @@ Public Declare Function uv_scale Lib "libuview.dll" (ByVal ctx As Long, ByVal sx
 Public Declare Function uv_rotate Lib "libuview.dll" (ByVal ctx As Long, ByVal th As Single) As Long
 Public Declare Function uv_convert_2_bpp Lib "libuview.dll" (ByVal ctx As Long, ByVal pix As Long, ByRef out As Long) As Long
 Public Declare Function uv_drop_mem Lib "libuview.dll" (ByVal ctx As Long, ByVal mem As Long) As Long
+Public Declare Function uv_strlen Lib "libuview.dll" (ByVal str As Long) As Long
+Public Declare Function uv_strcpy Lib "libuview.dll" (ByVal dest As Long, ByVal src As Long) As Long
+Public Declare Function uv_error_msg Lib "libuview.dll" (ByVal rc As Long, msg As Long) As Long
+Public Declare Function uv_error_def Lib "libuview.dll" (ByVal rc As Long, def As Long) As Long
 Public Declare Function uv_register_event Lib "libuview.dll" (ByVal ctx As Long, ByVal t As Long, ByVal pf As Long) As Long
-Public Declare Function uv_mouse_event Lib "libuview.dll" (ByVal ctx As Long, ByVal pix As Long, ByVal X As Long, ByVal Y As Long, ByVal btn As Long, ByVal modifiers As Long, ByVal state As Long) As Long
+Public Declare Function uv_mouse_event Lib "libuview.dll" (ByVal ctx As Long, ByVal pix As Long, ByVal x As Long, ByVal y As Long, ByVal btn As Long, ByVal modifiers As Long, ByVal state As Long) As Long
 
 
 '
@@ -55,8 +59,9 @@ Public Const EVENT_WARN As Long = 7
 '
 Public Const NORMAL As Long = 0
 Public Const ARROW As Long = 1
-Public Const HANDWAIT As Long = 2
-Public Const CARET As Long = 3
+Public Const HAND As Long = 2
+Public Const WAIT As Long = 3
+Public Const CARET As Long = 4
 
 '
 ' Error codes (internal)
@@ -66,6 +71,9 @@ Public Const IERR_FAILED As Long = -1
 Public Const IERR_OFFSET As Long = -1000
 Public Const IERR_VALIDATE As Long = IERR_OFFSET - 1
 Public Const IERR_CREATE_CONTEXT As Long = IERR_OFFSET - 2
+Public Const IERR_LOAD_FONT As Long = IERR_OFFSET - 3
+
+Private g_view_pool As New Collection
 
 
 Public Function SUCCESS(rc As Long) As Boolean
@@ -82,59 +90,212 @@ End Function
 '***********************************************************************************
 
 Public Function errGetMsg(rc As Long, Optional detail As Boolean = False) As String
-    Dim S As String, d As String
+    Dim s As String, d As String
     Select Case rc
         Case IOK_SUCCEEDED:
-            S = "IOK_SUCCEEDED"
+            s = "IOK_SUCCEEDED"
             d = "Operation succeeded."
             
         Case IERR_FAILED:
-            S = "IERR_FAILED"
+            s = "IERR_FAILED"
             d = "Operation failed."
             
         Case IERR_VALIDATE:
-            S = "IERR_VALIDATE"
+            s = "IERR_VALIDATE"
             d = "Failed on validating module."
             
         Case IERR_CREATE_CONTEXT:
-            S = "IERR_CREATE_CONTEXT":
+            s = "IERR_CREATE_CONTEXT":
             d = "Failed on creating context."
             
+        Case IERR_LOAD_FONT:
+            s = "IERR_LOAD_FONT"
+            d = "Failed to load font."
+            
         Case Else:
-            S = CStr(rc)
-            d = "Unknown"
+            If uvGetErrorDef(rc, s) Then
+                Call uvGetErrorMsg(rc, d)
+            Else
+                s = CStr(rc)
+                d = "Unknown"
+            End If
     End Select
     
+    ' select the content
     If detail Then
         errGetMsg = d
     Else
-        errGetMsg = S ' short name
+        errGetMsg = s ' short name
     End If
 End Function
+
+
+'***********************************************************************************
+'Copy the string from C to VB
+'***********************************************************************************
+
+Public Function copy_string(ByVal src As Long) As String
+    
+    Dim lenS As Long
+    Dim str() As Byte
+    Dim dest As String
+    
+    lenS = uv_strlen(src)
+    
+    If lenS > 0 Then
+        ReDim str(lenS) As Byte
+        
+        If SUCCESS(uv_strcpy(VarPtr(str(0)), src)) Then
+            dest = StrConv(str, vbUnicode)
+        Else
+            dest = Space(1)
+        End If
+        
+        Erase str
+    End If
+    
+    copy_string = dest
+    
+End Function
+
+
+'***********************************************************************************
+'Get the error message (only used by libuview)
+'***********************************************************************************
+
+Private Function uvGetErrorDef(rc As Long, ByRef out As String) As Boolean
+    Dim i As Long
+    Dim def As Long
+    
+    i = uv_error_def(rc, def)
+    
+    If SUCCESS(i) Then
+        out = copy_string(def)
+        uvGetErrorDef = True
+    Else
+        uvGetErrorDef = False
+    End If
+End Function
+
+
+'***********************************************************************************
+'Get the error definition (only used by libuview)
+'***********************************************************************************
+
+Private Function uvGetErrorMsg(rc As Long, ByRef out As String) As Boolean
+    Dim i As Long
+    Dim msg As Long
+    
+    i = uv_error_msg(rc, msg)
+    
+    If SUCCESS(i) Then
+        out = copy_string(msg)
+        uvGetErrorMsg = True
+    Else
+        uvGetErrorMsg = False
+    End If
+End Function
+
 
 
 '***********************************************************************************
 'Events processing
 '***********************************************************************************
 
-Private Function eventShowInputbox(ByVal ctx As Long, ByVal currentText As String, ByVal retry As Long) As String
-    eventShowInputbox = InputBox("Value = ")
-End Function
+Private Sub eventCursor(ByVal ctx As Long, ByVal cursor As Long)
+    Dim obj As clsViewer
+    Set obj = getClass(ctx)
+    If Not obj Is Nothing Then Call obj.invokeCursor(ByVal cursor)
+End Sub
 
-Private Function eventGotoPage(ByVal ctx As Long, page As Long)
-    MsgBox page, , "page"
-End Function
+Private Sub eventGotoPage(ByVal ctx As Long, ByVal page As Long)
+    Dim obj As clsViewer
+    Set obj = getClass(ctx)
+    If Not obj Is Nothing Then Call obj.invokeGotoPage(ByVal page)
+End Sub
 
-Private Function eventCursor(ByVal ctx As Long, cursor As Long)
-    MsgBox cursor, , "cursor"
-End Function
+Private Sub eventGotoURL(ByVal ctx As Long, ByVal url As Long)
+    
+    Dim lenURL As Long
+    Dim str() As Byte
+    
+    lenURL = uv_strlen(url)
+    
+    If lenURL > 0 Then
+        ReDim str(lenURL) As Byte
+        
+        If SUCCESS(uv_strcpy(VarPtr(str(0)), url)) Then
+        
+            Dim obj As clsViewer
+            Set obj = getClass(ctx)
+            If Not obj Is Nothing Then Call obj.invokeGotoURL(ByVal StrConv(str, vbUnicode))
+        
+        End If
+        
+        Erase str
+    End If
+    
+End Sub
+
+Private Sub eventWarn(ByVal ctx As Long, ByVal msg As Long)
+    Dim obj As clsViewer
+    Set obj = getClass(ctx)
+    If Not obj Is Nothing Then Call obj.invokeWarn(ByVal copy_string(msg))
+End Sub
+
+
 
 '***********************************************************************************
 'Register generic events
 '***********************************************************************************
 
 Public Function registerEvents(ctx As Long) As Long
-    Call uv_register_event(ctx, EVENT_SHOW_INPUTBOX, AddressOf eventShowInputbox)
     Call uv_register_event(ctx, EVENT_CURSOR, AddressOf eventCursor)
     Call uv_register_event(ctx, EVENT_GOTO_PAGE, AddressOf eventGotoPage)
+    Call uv_register_event(ctx, EVENT_GOTO_URL, AddressOf eventGotoURL)
+    Call uv_register_event(ctx, EVENT_WARN, AddressOf eventWarn)
+End Function
+
+
+'***********************************************************************************
+'Manage all the classes in global
+'***********************************************************************************
+
+Public Sub addViewClass(obj As clsViewer)
+    g_view_pool.Add obj
+End Sub
+
+Public Sub removeViewClass(obj As clsViewer)
+    Dim i As Integer
+    For i = 1 To g_view_pool.Count
+        If g_view_pool.Item(i) Is obj Then
+            g_view_pool.Remove i
+            Exit For
+        End If
+    Next i
+End Sub
+
+'***********************************************************************************
+'Get a viewer class according to the pointer of context
+'***********************************************************************************
+
+Private Function getClass(pCtx As Long) As clsViewer
+    Dim i As Integer
+    Dim obj As clsViewer
+    
+    For i = 1 To g_view_pool.Count
+        Set obj = g_view_pool.Item(i)
+        If Not obj Is Nothing Then
+        
+            ' match with pointer
+            If obj.getContext() = pCtx Then
+                Set getClass = obj
+                Exit Function
+            End If
+            
+        End If
+    Next i
+    
+    ' not found
+    Set getClass = Nothing
 End Function

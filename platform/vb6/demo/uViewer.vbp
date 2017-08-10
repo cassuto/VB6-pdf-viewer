@@ -5,6 +5,7 @@ Module=modViewer; modViewer.bas
 Module=modMain; modMain.bas
 Class=clsViewer; clsViewer.cls
 Module=modGDI; modGDI.bas
+ResFile32="resource.res"
 IconForm="frmMain"
 Startup="Sub Main"
 HelpFile=""
