@@ -7,11 +7,11 @@ uViewer
 <br/>For a demo project for `Visual Basic 6`, please check 'platform/vb6/demo'.
 
 > To build:
-<br/>&emsp;In Windows, you should have the MinGW installed, in addition, GNU make, gcc, python, sed 4.2 or greater are also required.
-<br/>&emsp;Then, change the directory to the root of project.
-<br/>&emsp;&emsp; * make
-<br/>&emsp;&emsp; * make install
-<br/>&emsp;If you want to debug the demo project in VB6 IDE, please set `VB6_INSTALL_PATH` variable as your installation path of VB, to which we will copy the dll files.
+<br/>In Windows, you should have the MinGW installed, in addition, GNU make, gcc, python, sed 4.2 or greater are also required.
+<br/>Then, change the directory to the root of project.
+<br/>&emsp;> make
+<br/>&emsp;> make install
+<br/>If you want to debug the demo project in VB6 IDE, please set `VB6_INSTALL_PATH` variable as your installation path of VB, to which we will copy the dll files.
 
 ----
 
