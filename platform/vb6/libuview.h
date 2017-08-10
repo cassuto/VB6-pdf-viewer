@@ -57,10 +57,20 @@
 #define CHECKR_MAGIC(m) do { if(m != UVIEW_MAGIC) return; } while(0);
 #define RETURN_NULL_CHECK_MAGIC do { if(m != UVIEW_MAGIC) return NULL; } while(0);
 
+/** @def GET_ELEMENTS
+ * Calculates the number of elements in a statically sized array.
+ * @returns Element count.
+ * @param   aArray      Array in question.
+ */
+#define GET_ELEMENTS(aArray)         ( sizeof(aArray) / sizeof((aArray)[0]) )
+
+
 /**
  * Error definitions
  */
 
+/* gen{{ */
+ 
 /** Operation succeeded. */
 #define OK_SUCCEEDED (0)
 /** Operation failed. */
@@ -83,6 +93,8 @@
 #define ERR_RESOLVE_LINKS (-9)
 /** No enough infomation to do this operation */
 #define ERR_NO_ENOUGH_INFOMATION (-10)
+
+/* }}gen */
 
 
 #define V_SUCCESS(rc) (rc >= 0)

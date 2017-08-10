@@ -69,6 +69,7 @@ typedef struct uview_s {
     int             page_count;
     fz_outline      *outline;
     int             outline_deferred;
+    float           rotate;
 
     fnEventInputBox cb_event_inputbox;
     fnEventCheckBox cb_event_checkbox;
@@ -90,7 +91,15 @@ typedef struct pixmap_s {
     fz_rect page_bbox;
     int pageno;
     int incomplete;
+    double resolution;
 } pixmap_t;
+
+typedef struct errinfo_s {
+    const char *msg_short;
+    const char *msg_detail;
+    const char *definition;
+    int code;
+} errinfo_t;
 
 /*******************************************************************************
 *   Exported Functions                                                         *
@@ -109,6 +118,10 @@ DECL(void)          uv_scale(uview_t *p, float sx, float sy);
 DECL(void)          uv_rotate(uview_t *p, float th);
 DECL(int)           uv_convert_2_bpp(uview_t *p, pixmap_t *pix, char **out);
 DECL(int)           uv_drop_mem(uview_t *p, char *mem);
+DECL(int)           uv_strlen(const char *str);
+DECL(int)           uv_strcpy(char *src, const char *dest);
+DECL(int)           uv_error_msg(int rc, const char **msg);
+DECL(int)           uv_error_def(int rc, const char **def);
 DECL(int)           uv_register_event(uview_t *p, event_type_t t, void *pf);
 DECL(int)           uv_mouse_event(uview_t *p, pixmap_t *pix, int x, int y, int btn, int modifiers, int state);
 
@@ -133,6 +146,14 @@ static VBF(void)  dummy_p_n(uview_t *, int);
 # define MAX(n1, n2) (n1 > n2 ? n1 : n2)
 # define MIN(n1, n2) (n1 < n2 ? n1 : n2)
 #endif
+
+/*******************************************************************************
+*   Error infomations                                                          *
+*******************************************************************************/
+static const errinfo_t g_errorsDescriptors[] = {
+#   include <errors-generated.h>
+    {"Unknown", "Unknown status", "UNKNOWN", 0}
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -232,6 +253,7 @@ DECL(uview_t *) uv_create_context() {
     n->outline = NULL;
     n->outline_deferred = 0;
     n->docpath = NULL;
+    n->rotate = 0;
 
     /*
      Register the default file types to handle.
@@ -327,6 +349,7 @@ DECL(void) uv_rotate(uview_t *p, float th) {
     CHECKR_MAGIC(p->magic);
 
     fz_rotate(&p->ctm, th);
+    p->rotate = th;
 }
 
 /**
@@ -383,6 +406,90 @@ DECL(int) uv_drop_mem(uview_t *p, char *mem) {
     CHECK_MAGIC(p->magic);
 
     free(mem);
+    return OK_SUCCEEDED;
+}
+
+/**
+ * This function is only used by Visual Basic.
+ * Get the length of a string that was terminated with '\0'.
+ * @param str Pointer to the target string.
+ * @return 0 if failed.
+ * @return > 0 the length of string.
+ */
+DECL(int) uv_strlen(const char *str) {
+    if (!str)
+        return 0;
+    return strlen(str);
+}
+
+/**
+ * This function is only used by Visual Basic.
+ * Copy a string, which was terminated with '\0', to destination
+ * memory.
+ * The destination memory should have enough space to store the source
+ * string.
+ * @param dest Pointer to the target memory.
+ * @param src Pointer to the source string.
+ * @return status code
+ */
+DECL(int) uv_strcpy(char *dest, const char *src) {
+    CHECK_STRICT_PTR(src);
+    CHECK_STRICT_PTR(dest);
+    
+    strcpy(dest, src);
+    return OK_SUCCEEDED;
+}
+
+
+/**
+ * Get the infomation of error according to the status code.
+ * @param rc status code.
+ * @return 0 if the code is not found.
+ * @return Pointer to the error_info_t structure.
+ */
+static const errinfo_t *geterr(int rc) {
+    unsigned i;
+    int matched = 0;
+
+    for(i=0;i<GET_ELEMENTS(g_errorsDescriptors)-1;i++) {
+        if(g_errorsDescriptors[i].code == rc) {
+            matched = 1;
+            break;
+        }
+    }
+
+    if(matched)
+        return &g_errorsDescriptors[i];
+    else {
+        return &g_errorsDescriptors[GET_ELEMENTS(g_errorsDescriptors)-2];
+    }
+}
+
+/**
+ * Get the error message according to the status code.
+ * @param rc status code.
+ * @param msg Where to store the pointer of message text.
+ * @return OK_SUCCEEDED.
+ * @return else if failed.
+ */
+DECL(int) uv_error_msg(int rc, const char **msg) {
+    CHECK_STRICT_PTR(msg);
+   
+    *msg = geterr(rc)->msg_detail;
+    return OK_SUCCEEDED;
+}
+
+/**
+ * Get the error definition according to the status code.
+ * @param rc status code.
+ * @param def Where to store the pointer of text.
+ * @return OK_SUCCEEDED.
+ * @return else if failed.
+ */
+DECL(int) uv_error_def(int rc, const char **def) {
+    CHECK_STRICT_PTR(def);
+    
+    *def = geterr(rc)->definition;
     return OK_SUCCEEDED;
 }
 
@@ -455,6 +562,7 @@ DECL(int) uv_mouse_event(uview_t *p, pixmap_t *pix, int x, int y, int btn, int m
     point.x = x /* - panx*/ + irect.x0;
     point.y = y /* - pany*/ + irect.y0;
 
+    ctm = p->ctm;
     fz_invert_matrix(&ctm, &ctm);
     fz_transform_point(&point, &ctm);
 
@@ -591,7 +699,7 @@ DECL(int) uv_mouse_event(uview_t *p, pixmap_t *pix, int x, int y, int btn, int m
         else
             POST_EVENT(p, cursor, (p, ARROW));
     }
-
+    
     return OK_SUCCEEDED;
 }
 
@@ -719,6 +827,7 @@ DECL(int) uv_render_pixmap(uview_t *p, int page, pixmap_t **pix) {
     pixmap->page_links = NULL;
     pixmap->pageno = page;
     pixmap->incomplete = 0;
+    pixmap->resolution = 72;
     *pix = pixmap;
     return OK_SUCCEEDED;
 }
