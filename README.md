@@ -15,10 +15,11 @@ uViewer
 
 ----
 
-<br/>&emsp;There will be two font libraries in 'build' directory:
+<br/>There will be two font libraries in 'build' directory:
 *  One is called 'libuvfont', which contained some frequently-used fonts. Be careful that some them is copyright, see /resources/fonts/*/COPYING for details.
 *  Another, called 'libuvfont-tiny', is a lite version of the first one.
-<br/>&emsp;To register a font (load it into memory as a shared object), consider `uv_register_font()` api.
+<br/>
+<br/>To register a font (load it into memory as a shared object), consider `uv_register_font()` api.
 
 ----
   
